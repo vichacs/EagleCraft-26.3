@@ -1,45 +1,9 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  html, body {
-    height: 100%; margin: 0;
-    background: #121212;
-    font-family: "Segoe UI", system-ui, sans-serif;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #wrap { text-align: center; padding: 16px; }
-  #jugar {
-    padding: 18px 56px;
-    font-size: 1.6rem; font-weight: 800; letter-spacing: .1em;
-    color: #0b0b0b;
-    background: #2ecc40;
-    border: 3px solid #1b8a28;
-    border-radius: 12px;
-    box-shadow: 0 6px 0 #14661d;
-    cursor: pointer;
-    transition: transform .08s, box-shadow .08s, background .15s;
-  }
-  #jugar:hover { background: #3be24f; }
-  #jugar:active { transform: translateY(5px); box-shadow: 0 1px 0 #14661d; }
-  #jugar:focus-visible { outline: 3px solid #bdbdbd; outline-offset: 4px; }
-  #jugar:disabled { background: #6b6b6b; border-color: #4a4a4a; box-shadow: 0 6px 0 #333; color: #ddd; cursor: progress; }
-  #msg { margin-top: 18px; min-height: 1.3em; color: #9e9e9e; font-size: .95rem; }
-  #msg.error { color: #ff6b6b; }
-</style>
-</head>
-<body>
-<div id="wrap">
-  <button id="jugar" type="button">JUGAR</button>
-  <div id="msg" role="status" aria-live="polite"></div>
-</div>
-
 <script>
   // ====== URL DEL RELEASE (la que descarga el .html) ======
   const URL_JUEGO = "https://github.com/vichacs/EagleCraft-26.3/releases/download/s/index.html";
   // ========================================================
+
+  const TITULO = "Google Classroom";
 
   // GitHub Releases no permite CORS: se prueba directo y luego con espejos de GitHub
   const ORIGENES = [
@@ -53,6 +17,12 @@
   const msg = document.getElementById("msg");
 
   function aviso(t, error) { msg.textContent = t; msg.className = error ? "error" : ""; }
+
+  function ponerTitulo() {
+    document.title = TITULO;
+    // Si la página está incrustada, solo se puede cambiar el título de la pestaña si es del mismo origen
+    try { window.top.document.title = TITULO; } catch (e) {}
+  }
 
   // Descarga en streaming; se corta si no hay respuesta o se queda parada
   async function bajar(url, progreso) {
@@ -81,58 +51,39 @@
   }
 
   boton.addEventListener("click", async () => {
-    // Se abre dentro del clic para que el navegador no bloquee la ventana
-    const w = window.open("about:blank", "_blank");
-    if (!w) {
-      aviso("El navegador bloqueó la ventana. Permite las ventanas emergentes y vuelve a pulsar.", true);
-      return;
-    }
-    w.document.open();
-    w.document.write(
-      '<!DOCTYPE html><html style="height:100%"><head><meta charset="UTF-8"><title>Google Classroom</title></head>' +
-      '<body style="margin:0;height:100%;background:#121212;color:#9e9e9e;font-family:sans-serif;' +
-      'display:flex;align-items:center;justify-content:center"><div id="p">Conectando…</div></body></html>'
-    );
-    w.document.close();
-    w.document.title = "Google Classroom";
-
     boton.disabled = true;
-    aviso("Descargando…");
-    const mostrar = (t) => { const p = w.document.getElementById("p"); if (p) p.textContent = t; };
+    aviso("Conectando…");
 
     let blob = null;
     for (let i = 0; i < ORIGENES.length && !blob; i++) {
       try {
-        mostrar(i === 0 ? "Conectando…" : "Probando otra ruta (" + i + "/" + (ORIGENES.length - 1) + ")…");
+        aviso(i === 0 ? "Conectando…" : "Probando otra ruta (" + i + "/" + (ORIGENES.length - 1) + ")…");
         blob = await bajar(ORIGENES[i](URL_JUEGO), (r, t) => {
           const mb = (r / 1048576).toFixed(1);
-          mostrar("Descargando… " + (t ? Math.round(r / t * 100) + "% (" + mb + " MB)" : mb + " MB"));
+          aviso("Descargando… " + (t ? Math.round(r / t * 100) + "% (" + mb + " MB)" : mb + " MB"));
         });
       } catch (e) { console.warn("Ruta " + i + " falló:", e); }
     }
 
     if (!blob) {
-      w.close();
       aviso("No se pudo descargar el juego desde GitHub. Inténtalo de nuevo en unos minutos.", true);
       boton.disabled = false;
       return;
     }
 
-    // Se carga como archivo en un iframe a pantalla completa (mejor que document.write con 90 MB)
+    // El juego sustituye a la página actual, a pantalla completa, en la misma pestaña
     const url = URL.createObjectURL(blob);
-    const marco = w.document.createElement("iframe");
-    marco.style.cssText = "border:0;width:100%;height:100%";
+    const marco = document.createElement("iframe");
+    marco.style.cssText = "border:0;position:fixed;inset:0;width:100%;height:100%;background:#121212";
     marco.setAttribute("allow", "fullscreen; gamepad; autoplay; pointer-lock; clipboard-write");
     marco.setAttribute("allowfullscreen", "");
     marco.src = url;
-    w.document.body.style.display = "block";
-    w.document.body.style.overflow = "hidden";
-    w.document.body.textContent = "";
-    w.document.body.appendChild(marco);
 
-    aviso("");
-    boton.disabled = false;
+    document.body.style.overflow = "hidden";
+    document.body.textContent = "";
+    document.body.appendChild(marco);
+
+    ponerTitulo();
+    setInterval(ponerTitulo, 1000);
   });
 </script>
-</body>
-</html>
